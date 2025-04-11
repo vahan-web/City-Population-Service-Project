@@ -1,0 +1,40 @@
+replicaCount: 1
+
+image:
+  # Update this to your actual image repository
+  repository: your-dockerhub-username/city-population-service
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 5000
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Application configuration
+config:
+  elasticsearch:
+    host: elasticsearch-master
+    port: 9200
+    # Optional username and password
+    # user: elastic
+    # password: changeme
+
+# Elasticsearch dependency
+elasticsearch:
+  enabled: true
+  clusterName: elasticsearch
+  nodeGroup: master
+  replicas: 1
+  minimumMasterNodes: 1
+  persistence:
+    enabled: true
+    size: 5Gi
