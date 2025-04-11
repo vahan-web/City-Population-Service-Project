@@ -1,91 +1,77 @@
-# City Population Service
+# City Population Service with MySQL
 
-A containerized microservice that maintains a list of cities and their populations, with RESTful endpoints for retrieving and updating population information.
+This project provides a containerized RESTful service that maintains a list of cities and their populations, with data stored in a MySQL database. The entire stack is deployed on Kubernetes using Helm charts.
+
+## Project Overview
+
+The system consists of two main components:
+
+1. **MySQL Database** - A StatefulSet deployment of MySQL
+2. **City Population Service** - A Python Flask application that provides REST endpoints
 
 ## Features
 
 - Health check endpoint (`/health`)
-- Endpoint for inserting/updating a city's population (`/city` - PUT/POST)
+- Endpoint for inserting/updating a city's population (`/city` - POST/PUT)
 - Endpoint for retrieving a city's population (`/city/<name>` - GET)
-- Data stored in MySQL database
-- Containerized with Docker
-- Deployable to Kubernetes via Helm chart
+- Data persistence in MySQL
+- Fully containerized application and database
+- Kubernetes deployment with Helm charts
+- Separate deployment of database and application for better scalability
 
-## Project Structure
+## Repository Structure
 
 ```
-city-population-service/
-├── app/
-│   ├── __init__.py      # Flask application factory
-│   ├── main.py          # Route definitions and handlers
-│   └── db.py            # Database client for MySQL
-├── helm/
-│   └── city-population-service/
-│       ├── Chart.yaml             # Helm chart metadata with MySQL dependency
-│       ├── values.yaml            # Configuration values for the service
-│       └── templates/
-│           ├── deployment.yaml    # Kubernetes deployment configuration
-│           ├── service.yaml       # Kubernetes service configuration
-│           ├── secret.yaml        # Kubernetes secret for database credentials
-│           └── _helpers.tpl       # Helper templates for Helm
-├── Dockerfile          # Docker configuration for building the container
-├── requirements.txt    # Python dependencies
-├── wsgi.py             # WSGI entry point
-└── README.md           # This file
+├── mysql-statefulset/         # MySQL Helm chart
+│   ├── Chart.yaml
+│   ├── values.yaml
+│   └── templates/
+│       ├── statefulset.yaml
+│       ├── service.yaml
+│       ├── configmap.yaml
+│       ├── secret.yaml
+│       └── _helpers.tpl
+│
+├── city-population-service/   # Application Helm chart
+│   ├── Chart.yaml
+│   ├── values.yaml
+│   └── templates/
+│       ├── deployment.yaml
+│       ├── service.yaml
+│       ├── configmap.yaml
+│       ├── secret.yaml
+│       └── _helpers.tpl
+│
+├── app/                       # Application code
+│   ├── __init__.py
+│   ├── main.py
+│   └── db.py
+│
+├── Dockerfile                 # Container definition
+├── requirements.txt           # Python dependencies
+└── wsgi.py                    # WSGI entry point
 ```
 
-## API Usage
+## Prerequisites
 
-### Check Service Health
-```
-GET /health
-```
-Returns "OK" if the service is up and running.
-
-### Add or Update a City's Population
-```
-POST /city
-Content-Type: application/json
-
-{
-  "name": "New York",
-  "population": 8804190
-}
-```
-Adds a new city or updates an existing city's population.
-
-### Retrieve a City's Population
-```
-GET /city/new-york
-```
-Returns the population of the specified city.
+- Docker
+- Kubernetes cluster (local or cloud)
+- Helm v3
+- kubectl configured to access your cluster
 
 ## Local Development
 
-### Prerequisites
-- Python 3.8+
-- MySQL database
-- Docker (for containerization)
-- Kubernetes and Helm (for deployment)
+### Setup Python Environment
 
-### Setup
-
-1. Clone the repository:
 ```bash
-git clone <repository-url>
-cd city-population-service
-```
-
-2. Create a virtual environment and install dependencies:
-```bash
+# Create virtual environment
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
-```
 
-3. Set up local MySQL database:
-```bash
-# Using Docker for local development
+# Install dependencies
+pip install -r requirements.txt
+
+# Start MySQL with Docker
 docker run -d \
   --name mysql \
   -e MYSQL_ROOT_PASSWORD=rootpassword \
@@ -94,33 +80,30 @@ docker run -d \
   -e MYSQL_PASSWORD=password \
   -p 3306:3306 \
   mysql:8.0
-```
 
-4. Set environment variables:
-```bash
+# Set environment variables
 export MYSQL_HOST=localhost
 export MYSQL_PORT=3306
 export MYSQL_DATABASE=citydb
 export MYSQL_USER=cityapp
 export MYSQL_PASSWORD=password
-```
 
-5. Run the application:
-```bash
+# Run application
 python wsgi.py
 ```
 
-## Docker Build
+### Build Docker Image
 
-Build the Docker image:
 ```bash
+# Build image
 docker build -t city-population-service:latest .
-```
 
-Run the container:
-```bash
+# Test with Docker network
+docker network create city-net
+docker network connect city-net mysql
 docker run -p 5000:5000 \
-  -e MYSQL_HOST=mysql-host \
+  --network city-net \
+  -e MYSQL_HOST=mysql \
   -e MYSQL_PORT=3306 \
   -e MYSQL_DATABASE=citydb \
   -e MYSQL_USER=cityapp \
@@ -128,171 +111,155 @@ docker run -p 5000:5000 \
   city-population-service:latest
 ```
 
-## Kubernetes Deployment with Helm
+## Kubernetes Deployment
 
-### Prerequisites
-- A Kubernetes cluster
-- Helm v3 installed
-- `kubectl` configured to access your cluster
+### Prepare for Deployment
 
-### Adding Required Helm Repositories
+1. Push your Docker image to a container registry:
+   ```bash
+   # Tag image for your registry
+   docker tag city-population-service:latest your-registry/city-population-service:latest
+   
+   # Push to registry
+   docker push your-registry/city-population-service:latest
+   ```
 
-```bash
-# Add Bitnami repo for MySQL chart
-helm repo add bitnami https://charts.bitnami.com/bitnami
-helm repo update
+2. Update image repository in values.yaml for both charts:
+   ```yaml
+   # In city-population-service/values.yaml
+   image:
+     repository: your-registry/city-population-service
+     tag: latest
+   ```
+
+### Deploy MySQL StatefulSet
+
+1. Validate the MySQL Helm chart:
+   ```bash
+   helm template mysql-test ./mysql-statefulset
+   ```
+
+2. Deploy MySQL:
+   ```bash
+   helm install mysql ./mysql-statefulset
+   ```
+
+3. Verify MySQL deployment:
+   ```bash
+   kubectl get pods -l app.kubernetes.io/name=mysql-statefulset
+   kubectl get pvc -l app.kubernetes.io/name=mysql-statefulset
+   ```
+
+### Deploy City Population Service
+
+1. Validate the application Helm chart:
+   ```bash
+   helm template city-test ./city-population-service
+   ```
+
+2. Deploy the application:
+   ```bash
+   helm install city-population ./city-population-service
+   ```
+
+3. Verify application deployment:
+   ```bash
+   kubectl get pods -l app.kubernetes.io/name=city-population-service
+   ```
+
+## Testing the Application
+
+1. Port-forward to the service:
+   ```bash
+   kubectl port-forward svc/city-population-city-population-service 8080:80
+   ```
+
+2. Test the endpoints:
+   ```bash
+   # Health check
+   curl http://localhost:8080/health
+   
+   # Add a city
+   curl -X POST http://localhost:8080/city \
+     -H "Content-Type: application/json" \
+     -d '{"name":"New York", "population":8804190}'
+   
+   # Get a city's population
+   curl http://localhost:8080/city/new%20york
+   ```
+
+## Customizing Deployment
+
+### Using Custom Values
+
+1. Create a custom values file (e.g., `prod-values.yaml`)
+2. Deploy with custom values:
+   ```bash
+   helm install mysql ./mysql-statefulset -f mysql-prod-values.yaml
+   helm install city-population ./city-population-service -f city-prod-values.yaml
+   ```
+
+### Key Configuration Options
+
+#### MySQL Values
+
+```yaml
+mysql:
+  # Resource allocation
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+  
+  # Storage configuration
+  persistence:
+    size: 10Gi
+    storageClass: "standard"  # Use your storage class
+  
+  # Authentication
+  auth:
+    rootPassword: "your-secure-root-password"
+    password: "your-secure-user-password"
 ```
 
-### Update Dependencies
+#### Application Values
 
-```bash
-# Inside the helm/city-population-service directory
-helm dependency update
-```
+```yaml
+# Scaling
+replicaCount: 3
 
-### Deployment Steps
+# Resources
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 200m
+    memory: 256Mi
 
-1. Push your Docker image to a registry accessible to your Kubernetes cluster:
-```bash
-# Tag the image for your registry
-docker tag city-population-service:latest your-registry/city-population-service:latest
-
-# Push the image
-docker push your-registry/city-population-service:latest
-```
-
-2. Update the `helm/city-population-service/values.yaml` with your specific configuration:
-   - Update the image repository to point to your Docker image
-   - Configure MySQL settings as needed
-
-3. Deploy the Helm chart:
-```bash
-helm install city-population ./helm/city-population-service
-```
-
-4. Check the status of the deployment:
-```bash
-kubectl get pods
-```
-
-### Connecting to AWS EKS
-
-If you're using AWS EKS, follow these steps to connect:
-
-1. Configure AWS CLI:
-```bash
-aws configure
-```
-
-2. Update your kubeconfig:
-```bash
-aws eks update-kubeconfig --name your-cluster-name --region your-aws-region
-```
-
-3. Verify connection:
-```bash
-kubectl get nodes
-```
-
-4. Deploy your application as described above.
-
-## Testing the Endpoints
-
-You can use port-forwarding to test your endpoints:
-
-```bash
-# Forward the service port to your local machine
-kubectl port-forward svc/city-population-city-population-service 5000:80
-```
-
-Then in another terminal:
-
-```bash
-# Test health endpoint
-curl http://localhost:5000/health
-
-# Add a city
-curl -X POST http://localhost:5000/city \
-  -H "Content-Type: application/json" \
-  -d '{"name":"New York", "population":8804190}'
-
-# Get a city
-curl http://localhost:5000/city/new%20york
+# MySQL connection
+config:
+  mysql:
+    host: mysql-mysql
+    port: 3306
 ```
 
 ## Troubleshooting
 
-### Application Issues
+### Common Issues
 
-If the application isn't working as expected:
+1. **Database connection errors:**
+   - Check MySQL pod status: `kubectl get pods -l app.kubernetes.io/name=mysql-statefulset`
+   - Check MySQL logs: `kubectl logs -l app.kubernetes.io/name=mysql-statefulset`
+   - Verify service: `kubectl get svc mysql-mysql`
 
-1. Check application logs:
-```bash
-kubectl logs -l app.kubernetes.io/name=city-population-service
-```
+2. **Application not starting:**
+   - Check application logs: `kubectl logs -l app.kubernetes.io/name=city-population-service`
+   - Verify environment variables: `kubectl describe pods -l app.kubernetes.io/name=city-population-service`
 
-2. Verify MySQL connection:
-```bash
-kubectl exec -it <pod-name> -- env | grep MYSQL
-```
-
-3. Test database connectivity from the pod:
-```bash
-kubectl exec -it <pod-name> -- python -c "import pymysql; conn = pymysql.connect(host='city-population-mysql', user='cityapp', password='password123', database='citydb'); print('Connection successful!')"
-```
-
-### Database Issues
-
-If there are issues with the database:
-
-1. Check MySQL pod status:
-```bash
-kubectl get pods -l app.kubernetes.io/name=mysql
-```
-
-2. Check MySQL logs:
-```bash
-kubectl logs -l app.kubernetes.io/name=mysql
-```
-
-3. Check MySQL service:
-```bash
-kubectl get service city-population-mysql
-```
-
-## Production Considerations
-
-For production deployments:
-
-1. **Security**:
-   - Use Kubernetes Secrets for storing sensitive information like database credentials
-   - Configure network policies to restrict access to the database
-   - Enable TLS for secure communication
-
-2. **Scalability**:
-   - Configure Horizontal Pod Autoscaler for the application
-   - Set appropriate resource requests and limits
-   - Use a managed database service for MySQL in production
-
-3. **Reliability**:
-   - Implement proper health checks and readiness probes
-   - Configure appropriate liveness probes
-   - Set up database backups and replication
-   - Use persistent volumes with appropriate storage classes
-
-4. **Monitoring and Logging**:
-   - Implement monitoring with tools like Prometheus and Grafana
-   - Set up centralized logging with tools like ELK stack or CloudWatch
-   - Configure alerts for critical issues
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/new-feature`
-3. Commit your changes: `git commit -am 'Add new feature'`
-4. Push to the branch: `git push origin feature/new-feature`
-5. Submit a pull request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
+3. **Cannot access service:**
+   - Check service: `kubectl get svc city-population-city-population-service`
+   - Check endpoints: `kubectl get endpoints city-population-city-population-service`
