@@ -8,10 +8,10 @@ def create_app():
     from app.main import main_bp
     app.register_blueprint(main_bp)
     
-    # Connect to elasticsearch when app starts
-    from app.db import es_client
+    # Connect to database when app starts
+    from app.db import db_client
     with app.app_context():
-        if not es_client.connect():
-            app.logger.error("Failed to connect to Elasticsearch. Service may not function correctly.")
+        if not db_client.connect():
+            app.logger.error("Failed to connect to MySQL database. Service may not function correctly.")
     
     return app

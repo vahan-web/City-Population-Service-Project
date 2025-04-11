@@ -19,18 +19,19 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
-            - name: ELASTICSEARCH_HOST
-              value: {{ .Values.config.elasticsearch.host | quote }}
-            - name: ELASTICSEARCH_PORT
-              value: {{ .Values.config.elasticsearch.port | quote }}
-            {{- if .Values.config.elasticsearch.user }}
-            - name: ELASTICSEARCH_USER
-              value: {{ .Values.config.elasticsearch.user | quote }}
-            {{- end }}
-            {{- if .Values.config.elasticsearch.password }}
-            - name: ELASTICSEARCH_PASSWORD
-              value: {{ .Values.config.elasticsearch.password | quote }}
-            {{- end }}
+            - name: MYSQL_HOST
+              value: {{ .Values.config.mysql.host | quote }}
+            - name: MYSQL_PORT
+              value: {{ .Values.config.mysql.port | quote }}
+            - name: MYSQL_DATABASE
+              value: {{ .Values.config.mysql.database | quote }}
+            - name: MYSQL_USER
+              value: {{ .Values.config.mysql.user | quote }}
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "city-population-service.fullname" . }}-mysql-secret
+                  key: mysql-password
           ports:
             - name: http
               containerPort: 5000

@@ -1,9 +1,8 @@
 replicaCount: 1
 
 image:
-  # Update this to your actual image repository
-  repository: your-dockerhub-username/city-population-service
-  tag: latest
+  repository: your-account-id.dkr.ecr.your-aws-region.amazonaws.com/city-population-service
+  tag: mysql
   pullPolicy: IfNotPresent
 
 service:
@@ -21,20 +20,21 @@ resources:
 
 # Application configuration
 config:
-  elasticsearch:
-    host: elasticsearch-master
-    port: 9200
-    # Optional username and password
-    # user: elastic
-    # password: changeme
+  mysql:
+    host: city-population-mysql
+    port: 3306
+    database: citydb
+    user: cityapp
 
-# Elasticsearch dependency
-elasticsearch:
+# MySQL configuration
+mysql:
   enabled: true
-  clusterName: elasticsearch
-  nodeGroup: master
-  replicas: 1
-  minimumMasterNodes: 1
-  persistence:
-    enabled: true
-    size: 5Gi
+  auth:
+    database: citydb
+    username: cityapp
+    password: password123  # In production, use secrets management
+    rootPassword: rootpassword123  # In production, use secrets management
+  primary:
+    persistence:
+      enabled: true
+      size: 8Gi

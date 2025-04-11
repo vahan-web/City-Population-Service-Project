@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from app.db import es_client
+from app.db import db_client
 import logging
 
 # Configure logging
@@ -33,7 +33,7 @@ def upsert_city():
         return jsonify({'error': 'Population must be a valid integer'}), 400
     
     # Upsert city data
-    if es_client.upsert_city(city_name, population):
+    if db_client.upsert_city(city_name, population):
         return jsonify({
             'success': True,
             'message': f'City {city_name} updated with population {population}'
@@ -44,7 +44,7 @@ def upsert_city():
 @main_bp.route('/city/<name>', methods=['GET'])
 def get_city(name):
     """Get a city's population"""
-    population = es_client.get_city_population(name)
+    population = db_client.get_city_population(name)
     
     if population is not None:
         return jsonify({
