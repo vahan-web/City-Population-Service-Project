@@ -188,6 +188,20 @@ docker run -p 5000:5000 \
    curl http://localhost:8080/city/new%20york
    ```
 
+3. Test Exposing the API Publicly:
+   ```bash
+   # Health check
+   curl http://<EXTERNAL-IP>/health
+   
+   # Add a city
+   curl -X POST http://<EXTERNAL-IP>/city \
+     -H "Content-Type: application/json" \
+     -d '{"name":"New York", "population":8804190}'
+   
+   # Get a city's population
+   curl http://<EXTERNAL-IP>/city/new%20york
+   ```
+
 ## Customizing Deployment
 
 ### Using Custom Values
