@@ -188,8 +188,11 @@ docker run -p 5000:5000 \
    curl http://localhost:8080/city/new%20york
    ```
 
-3. Test Exposing the API Publicly:
+3. Test Exposing the API Publicly: LoadBalancer service type is providing  static IP address.
    ```bash
+   # Check the assigned external IP
+   kubectl get svc city-population-city-population-service
+   
    # Health check
    curl http://<EXTERNAL-IP>/health
    
